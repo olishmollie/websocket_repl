@@ -1,4 +1,4 @@
-var psh = (function() {
+var psh = (function () {
 
     var psh = function () {
 
@@ -121,11 +121,11 @@ var psh = (function() {
             }
         }
 
-        self.push = function(txt) {
+        self.push = function (txt) {
             self.htmlElement.value += txt;
         }
 
-        self.value = function() {
+        self.value = function () {
             return buf;
         }
 

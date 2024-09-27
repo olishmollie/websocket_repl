@@ -12,7 +12,9 @@ ServerConnection.write = ServerConnection.send
 
 
 class WebSocketRepl(InteractiveConsole):
-    def __init__(self, websocket, locals=None):
+    FORBIDDEN = ["import code", "from code import", "exit()"]
+
+    def __init__(self, websocket: ServerConnection, locals=None):
         super().__init__(locals=locals)
         self.websocket = websocket
 
@@ -20,16 +22,15 @@ class WebSocketRepl(InteractiveConsole):
         self.websocket.send(prompt)
         try:
             code = self.websocket.recv()
-            if "import code" in code or "from code import" in code:
-                return "print('Fuck you, dude.')"
-            # sys.__stdout__.write(f"code = {repr(code)}")
-            # sys.__stdout__.flush()
+            for cmd in self.FORBIDDEN:
+                if cmd in code:
+                    code = ""
             return code
         except ConnectionClosedOK:
             sys.stdout = sys.__stdout__
             self.websocket.close()
 
-    def write(self, data):
+    def write(self, data: str):
         """Write to the websocket if an exception occurs."""
         self.websocket.send(data)
 
@@ -40,7 +41,8 @@ class WebSocketServer:
         self.port = port
         self.websocket = None
 
-    def handler(self, websocket):
+    def handler(self, websocket: ServerConnection):
+        """Handle an incoming websocket connection."""
         print(f"Connection {websocket.remote_address} established.")
         self.websocket = websocket
         sys.stdout = websocket
@@ -60,7 +62,7 @@ class WebSocketServer:
             except KeyboardInterrupt:
                 if self.websocket:
                     self.websocket.close()
-                    sys.stdout = sys.__stdout__
+                sys.stdout = sys.__stdout__
 
 
 if __name__ == "__main__":
