@@ -1,29 +1,37 @@
 var psh = (function () {
 
-    var psh = function () {
+    var psh = function (debug) {
 
         const self = this;
         const socket = new WebSocket("ws://127.0.0.1:5000");
 
-        var pos = 0;
-        var lno = 0;
-        var buf = "";
+        var state = {
+            pos: 0,
+            buf: ""
+        }
 
-        var messageCallback = (event) => {
-            self.push(event.data);
+        resetMessageCallback();
+
+        function setValue(txt) {
+            self.htmlElement.value = txt;
+        }
+
+        function resetState() {
+            state.pos = 0;
+            state.buf = "";
         }
 
         function resetMessageCallback() {
             messageCallback = (event) => {
-                self.push(event.data);
+                push(event.data);
             }
         }
 
-        function sendBuf() {
-            if (socket !== undefined && socket != null) {
-                socket.send(buf);
-                pos = 0;
-                buf = "";
+        function appendMessageCallback(f) {
+            messageCallback = (event) => {
+                push(event.data);
+                f();
+                resetMessageCallback();
             }
         }
 
@@ -32,19 +40,29 @@ var psh = (function () {
             self.htmlElement.setSelectionRange(length, length);
         }
 
+        function push(txt) {
+            self.htmlElement.value += txt;
+            moveToEnd();
+        }
+
+        function clickHandler() {
+            moveToEnd();
+        }
+
+        function logState() {
+            if (debug) {
+                console.info(state);
+            }
+        }
+
         function keyHandler(e) {
             // Newline
             if (e.keyCode === 13) {
-                messageCallback = (event) => {
-                    self.push(event.data);
+                appendMessageCallback(() => {
                     moveToEnd();
-                    resetMessageCallback();
-                }
-                sendBuf();
-            }
-            // Shift
-            else if (e.keyCode === 16) {
-                // Do nothing.
+                    resetState();
+                });
+                socket.send(state.buf);
             }
             // C-c
             else if (e.ctrlKey && e.keyCode === 67) {
@@ -52,29 +70,28 @@ var psh = (function () {
             }
             // C-l
             else if (e.ctrlKey && e.keyCode === 76) {
-                // TODO: Clear the shell.
                 e.preventDefault();
-                messageCallback = (event) => {
-                    self.push(event.data);
-                    self.htmlElement.value += buf;
-                    resetMessageCallback();
-                }
-                self.htmlElement.value = "";
+                appendMessageCallback(() => {
+                    push(state.buf);
+                });
+                setValue("");
                 socket.send("");
             }
             // Backspace
             else if (e.keyCode === 8) {
-                if (pos === 0) {
+                if (e.ctrlKey || state.pos === 0) {
                     e.preventDefault();
                 } else {
-                    --pos;
-                    buf = buf.substring(0, buf.length - 1);
+                    --state.pos;
+                    state.buf = state.buf.substring(0, state.buf.length - 1);
                 }
             }
             // Tab
             else if (e.keyCode === 9) {
                 // TODO: Tab completion
                 e.preventDefault();
+                push("\t");
+                state.buf += "\t";
             }
             // C-p and C-n
             else if (e.ctrlKey && (e.keyCode === 78 || e.keyCode === 80)) {
@@ -88,22 +105,22 @@ var psh = (function () {
             }
             // C-b: Move backward
             else if (e.ctrlKey && e.keyCode === 66) {
-                if (pos === 0) {
+                if (state.pos === 0) {
                     e.preventDefault();
                 } else {
-                    --pos;
+                    --state.pos;
                 }
             }
             // C-f: Move forward;
             else if (e.ctrlKey && e.keyCode === 70) {
-                if (pos < buf.length)
-                    ++pos;
+                if (state.pos < state.buf.length)
+                    ++state.pos;
             }
             // Handle arrow keys
             else if (e.keyCode >= 37 && e.keyCode <= 40) {
                 switch (e.keyCode) {
                     case 37:
-                        if (pos === 0) {
+                        if (state.pos === 0) {
                             e.preventDefault();
                         }
                         break;
@@ -112,21 +129,19 @@ var psh = (function () {
                         e.preventDefault();
                 }
             }
+            // Shift/Alt/Ctrl
+            else if (e.keyCode >= 16 && e.keyCode <= 18) {
+                // Do nothing.
+            }
             // All other keys
-            else if (!e.ctrlKey) {
-                if (e.key !== undefined) {
-                    ++pos;
-                    buf += e.key;
-                }
+            else {
+                ++state.pos;
+                state.buf += e.key;
             }
         }
 
-        self.push = function (txt) {
-            self.htmlElement.value += txt;
-        }
-
         self.value = function () {
-            return buf;
+            return state.buf;
         }
 
         self.htmlElement = document.createElement("textarea");
@@ -137,7 +152,7 @@ var psh = (function () {
         self.htmlElement.style.height = "100%";
         self.htmlElement.style.width = "100%";
         self.htmlElement.contentEditable = true;
-        // self.htmlElement.removeEventListener("keydown", disableKeyboard);
+        self.htmlElement.spellcheck = false;
         self.htmlElement.addEventListener("keydown", keyHandler);
 
         socket.addEventListener("open", (event) => {
@@ -151,7 +166,6 @@ var psh = (function () {
         socket.addEventListener("close", (event) => {
             console.log("Websocket connection closed");
         });
-
     }
 
     return psh;
