@@ -63,6 +63,7 @@ class WebSocketServer:
                 if self.websocket:
                     self.websocket.close()
                 sys.stdout = sys.__stdout__
+                print("Connection closed.")
 
 
 if __name__ == "__main__":
