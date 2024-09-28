@@ -2,13 +2,20 @@ var psh = (function () {
   var psh = function (debug) {
     const self = this;
     const socket = new WebSocket("ws://127.0.0.1:5000");
-    const histlen = 10;
 
     // Tracks the line editing state.
     var lineState = {
       back: 0,
       front: 0,
       buf: "",
+    };
+
+    // Tracks history state.
+    var history = {
+      buf: [],
+      sp: -1,
+      idx: -1,
+      max: 3,
     };
 
     resetMessageCallback();
@@ -29,8 +36,7 @@ var psh = (function () {
       self.htmlElement.setSelectionRange(pos, pos);
     }
 
-    // Push repl-generated text to the shell. Should not be used
-    // for user input.
+    // Push repl-generated text to the shell. Not for user input.
     function push(txt) {
       self.htmlElement.value += txt;
       lineState.back = getLength();
@@ -69,10 +75,48 @@ var psh = (function () {
       moveToEnd();
     }
 
+    // Change the portion of the html that represents user input.
+    function setUserText(txt) {
+      self.htmlElement.setRangeText(
+        txt,
+        lineState.back,
+        lineState.back + lineState.front,
+        "end",
+      );
+    }
+
+    function addToHistory(cmd) {
+      if (history.sp < history.max - 1) {
+        history.buf.push(cmd);
+        ++history.sp;
+      } else {
+        for (var i = 0; i < history.max - 1; ++i) {
+          history.buf[i] = history.buf[i + 1];
+        }
+        history.buf[history.sp] = cmd;
+      }
+      history.idx = history.sp;
+    }
+
+    function getHistoryBackward() {
+      if (history.idx > 0) {
+        return history.buf[history.idx--];
+      }
+      return history.buf[0] || null;
+    }
+
+    function getHistoryForward() {
+      if (history.idx < history.buf.length - 1) {
+        return history.buf[++history.idx];
+      }
+      return null
+    }
+
     // Log shell state to the console.
     function logState() {
       if (debug) {
         console.info(lineState);
+        console.log(history);
       }
     }
 
@@ -86,6 +130,7 @@ var psh = (function () {
         appendMessageCallback(resetState);
         push("\n");
         socket.send(lineState.buf);
+        addToHistory(lineState.buf);
       }
       // C-c
       else if (e.ctrlKey && e.keyCode === 67) {
@@ -107,7 +152,8 @@ var psh = (function () {
         } else {
           --lineState.front;
           lineState.buf =
-            lineState.buf.slice(0, lineState.front) + lineState.buf.slice(lineState.front + 1);
+            lineState.buf.slice(0, lineState.front) +
+            lineState.buf.slice(lineState.front + 1);
         }
       }
       // Tab
@@ -118,14 +164,32 @@ var psh = (function () {
         push(spaces);
         lineState.buf += spaces;
       }
-      // C-p and C-n
-      else if (e.ctrlKey && (e.keyCode === 78 || e.keyCode === 80)) {
+      // C-p
+      else if (e.ctrlKey && e.keyCode === 80 || e.keyCode === 38) {
         // TODO: History
         e.preventDefault();
-        // if (lineState.history.length > 0 && lineState.hidx < lineState.history.length) {
-        //   lineState.buf = lineState.history[lineState.hidx++];
-        //   push(lineState.buf);
-        // }
+        cmd = getHistoryBackward();
+        if (cmd != null) {
+          setUserText("");
+          lineState.buf = cmd;
+          lineState.front = lineState.buf.length;
+          setUserText(lineState.buf);
+        }
+      }
+      // C-n/Down-arrow
+      else if (e.ctrlKey && e.keyCode === 78 || e.keyCode === 40) {
+        // TODO: History forward
+        e.preventDefault();
+        cmd = getHistoryForward();
+        setUserText("");
+        if (cmd != null) {
+          setUserText("");
+          lineState.buf = cmd;
+          lineState.front = lineState.buf.length;
+          setUserText(lineState.buf);
+        } else {
+          lineState.buf = "";
+        }
       }
       // C-a
       else if (e.ctrlKey && e.keyCode === 65) {
@@ -135,34 +199,19 @@ var psh = (function () {
         lineState.front = 0;
       }
       // C-b: Move backward
-      else if (e.ctrlKey && e.keyCode === 66) {
-        // The textarea already has this builtin, so just
-        // move update the state.
+      else if (e.ctrlKey && e.keyCode === 66 || e.keyCode === 37) {
+        // The textarea already has this builtin, so just update the state.
         if (lineState.front === 0) {
           e.preventDefault();
         } else {
           --lineState.front;
         }
       }
-      // C-f: Move forward;
-      else if (e.ctrlKey && e.keyCode === 70) {
-        // The textarea already has this builtin, so just
-        // move update the state.
+      // C-f/Right arrow: Move forward;
+      else if (e.ctrlKey && e.keyCode === 70 || e.keyCode === 39) {
+        // The textarea already has this builtin, so just update the state.
         if (lineState.front < lineState.buf.length) {
           ++lineState.front;
-        }
-      }
-      // Handle arrow keys
-      else if (e.keyCode >= 37 && e.keyCode <= 40) {
-        switch (e.keyCode) {
-          case 37:
-            if (lineState.front === 0) {
-              e.preventDefault();
-            }
-            break;
-          case 38:
-          case 40:
-            e.preventDefault();
         }
       }
       // Shift/Alt/Ctrl
