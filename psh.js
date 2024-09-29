@@ -158,6 +158,11 @@ var psh = (function () {
       }
     }
 
+    // Remove user text from `start` to `end`.
+    function removeUserText(start, end) {
+      self.htmlElement.setRangeText("", lineState.back + start, lineState.back + end);
+    }
+
     // Handle keydown events for line editing. The tricky part
     // is to not clobber the textarea's functionality while
     // also providing a decent line editing experience.
@@ -184,9 +189,18 @@ var psh = (function () {
         // Get the prompt back by sending empty data.
         socket.send("");
       }
+      // M-Backspace: Delete word
+      else if (e.altKey && e.keyCode === 8) {
+        e.preventDefault();
+        var end = lineState.front;
+        moveBackWord();
+        lineState.buf =
+          lineState.buf.slice(0, lineState.front) + lineState.buf.slice(end);
+        removeUserText(lineState.front, end);
+      }
       // Backspace
       else if (e.keyCode === 8) {
-        if (e.ctrlKey || e.altKey || lineState.front === 0) {
+        if (e.ctrlKey || lineState.front === 0) {
           e.preventDefault();
         } else {
           // Built-in functionality works here.
@@ -203,11 +217,7 @@ var psh = (function () {
           lineState.buf =
             lineState.buf.slice(0, lineState.front) +
             lineState.buf.slice(lineState.front + 1);
-          self.htmlElement.setRangeText(
-            "",
-            lineState.back + lineState.front,
-            lineState.back + lineState.front + 1,
-          );
+          removeUserText(lineState.front, lineState.front + 1);
         }
       }
       // Tab
