@@ -1,2 +1,2 @@
-const shell = new psh(true);
+const shell = new psh({"debug": true});
 document.querySelector("#box").append(shell.htmlElement);

@@ -1,5 +1,5 @@
 var psh = (function () {
-  var psh = function (debug) {
+  var psh = function (opts) {
     const self = this;
     const socket = new WebSocket("ws://127.0.0.1:5000");
 
@@ -81,7 +81,7 @@ var psh = (function () {
       self.htmlElement.setRangeText(
         txt,
         lineState.back,
-        lineState.back + lineState.front,
+        lineState.back + lineState.buf.length,
         "end",
       );
     }
@@ -152,7 +152,7 @@ var psh = (function () {
 
     // Log shell state to the console.
     function logState() {
-      if (debug) {
+      if (opts.debug) {
         console.info(lineState);
         console.log(history);
       }
@@ -233,9 +233,9 @@ var psh = (function () {
         e.preventDefault();
         cmd = getHistoryBackward();
         if (cmd != null) {
+          setUserText(cmd);
           lineState.buf = cmd;
-          lineState.front = lineState.buf.length;
-          setUserText(lineState.buf);
+          lineState.front = cmd.length;
         }
       }
       // C-n/Down-arrow: Cycle through history forwards
@@ -243,12 +243,13 @@ var psh = (function () {
         e.preventDefault();
         cmd = getHistoryForward();
         if (cmd != null) {
+          setUserText(cmd);
           lineState.buf = cmd;
-          lineState.front = lineState.buf.length;
+          lineState.front = cmd.length;
         } else {
+          setUserText("");
           lineState.buf = "";
         }
-        setUserText(lineState.buf);
       }
       // C-a: Move cursor to beginning
       else if (e.ctrlKey && e.keyCode === 65) {
@@ -278,7 +279,7 @@ var psh = (function () {
           moveBackWord();
         }
       }
-      // C-f/Right arrow: Move forward;
+      // C-f/Right arrow: Move forward
       else if ((e.ctrlKey && e.keyCode === 70) || e.keyCode === 39) {
         // The textarea already has this builtin, so just update the state.
         if (lineState.front < lineState.buf.length) {
