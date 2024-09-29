@@ -139,7 +139,7 @@ var psh = (function () {
       if (history.idx > 0) {
         return history.buf[--history.idx];
       }
-      return history.buf[0] || null;
+      return null;
     }
 
     // Cycle through history forwards.
