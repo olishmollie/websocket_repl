@@ -14,7 +14,7 @@ var psh = (function () {
     var history = {
       buf: [],
       sp: -1,
-      idx: -1,
+      idx: 0,
       max: 3,
     };
 
@@ -72,6 +72,7 @@ var psh = (function () {
 
     // Prevent clicking into "uneditable" parts of the shell.
     function clickHandler() {
+      // TODO
       moveToEnd();
     }
 
@@ -85,6 +86,41 @@ var psh = (function () {
       );
     }
 
+    // Move backward one word.
+    function moveBackWord() {
+      var spaceIdx = lineState.front - 1;
+      var inWord = false;
+      for (spaceIdx; spaceIdx >= 0; --spaceIdx) {
+        if (!inWord && lineState.buf[spaceIdx] != " ") {
+          inWord = true;
+          continue;
+        }
+        if (inWord && lineState.buf[spaceIdx] === " ") {
+          break;
+        }
+      }
+      lineState.front = spaceIdx + 1;
+      moveCursor(lineState.back + lineState.front);
+    }
+
+    // Move forward one word.
+    function moveForwardWord() {
+      var spaceIdx = lineState.front;
+      var inWord = false;
+      for (spaceIdx; spaceIdx < lineState.buf.length; ++spaceIdx) {
+        if (!inWord && lineState.buf[spaceIdx] != " ") {
+          inWord = true;
+          continue;
+        }
+        if (inWord && lineState.buf[spaceIdx] === " ") {
+          break;
+        }
+      }
+      lineState.front = spaceIdx;
+      moveCursor(lineState.back + lineState.front);
+    }
+
+    // Add `cmd` to history buffer.
     function addToHistory(cmd) {
       if (history.sp < history.max - 1) {
         history.buf.push(cmd);
@@ -95,21 +131,23 @@ var psh = (function () {
         }
         history.buf[history.sp] = cmd;
       }
-      history.idx = history.sp;
+      history.idx = history.sp + 1;
     }
 
+    // Cycle through history backwards.
     function getHistoryBackward() {
       if (history.idx > 0) {
-        return history.buf[history.idx--];
+        return history.buf[--history.idx];
       }
       return history.buf[0] || null;
     }
 
+    // Cycle through history forwards.
     function getHistoryForward() {
-      if (history.idx < history.buf.length - 1) {
+      if (history.idx < history.buf.length) {
         return history.buf[++history.idx];
       }
-      return null
+      return null;
     }
 
     // Log shell state to the console.
@@ -143,6 +181,7 @@ var psh = (function () {
           self.htmlElement.value += lineState.buf;
         });
         setValue("");
+        // Get the prompt back by sending empty data.
         socket.send("");
       }
       // Backspace
@@ -150,10 +189,25 @@ var psh = (function () {
         if (e.ctrlKey || e.altKey || lineState.front === 0) {
           e.preventDefault();
         } else {
+          // Built-in functionality works here.
           --lineState.front;
           lineState.buf =
             lineState.buf.slice(0, lineState.front) +
             lineState.buf.slice(lineState.front + 1);
+        }
+      }
+      // C-d: Delete forward
+      else if (e.ctrlKey && e.keyCode === 68) {
+        e.preventDefault();
+        if (lineState.front < lineState.buf.length) {
+          lineState.buf =
+            lineState.buf.slice(0, lineState.front) +
+            lineState.buf.slice(lineState.front + 1);
+          self.htmlElement.setRangeText(
+            "",
+            lineState.back + lineState.front,
+            lineState.back + lineState.front + 1,
+          );
         }
       }
       // Tab
@@ -164,42 +218,42 @@ var psh = (function () {
         push(spaces);
         lineState.buf += spaces;
       }
-      // C-p
-      else if (e.ctrlKey && e.keyCode === 80 || e.keyCode === 38) {
-        // TODO: History
+      // C-p/Up arrow: Cycle through history backwards
+      else if ((e.ctrlKey && e.keyCode === 80) || e.keyCode === 38) {
         e.preventDefault();
         cmd = getHistoryBackward();
         if (cmd != null) {
-          setUserText("");
           lineState.buf = cmd;
           lineState.front = lineState.buf.length;
           setUserText(lineState.buf);
         }
       }
-      // C-n/Down-arrow
-      else if (e.ctrlKey && e.keyCode === 78 || e.keyCode === 40) {
-        // TODO: History forward
+      // C-n/Down-arrow: Cycle through history forwards
+      else if ((e.ctrlKey && e.keyCode === 78) || e.keyCode === 40) {
         e.preventDefault();
         cmd = getHistoryForward();
-        setUserText("");
         if (cmd != null) {
-          setUserText("");
           lineState.buf = cmd;
           lineState.front = lineState.buf.length;
-          setUserText(lineState.buf);
         } else {
           lineState.buf = "";
         }
+        setUserText(lineState.buf);
       }
-      // C-a
+      // C-a: Move cursor to beginning
       else if (e.ctrlKey && e.keyCode === 65) {
-        // TODO: Move to beginning of input
         e.preventDefault();
         moveCursor(lineState.back);
         lineState.front = 0;
       }
-      // C-b: Move backward
-      else if (e.ctrlKey && e.keyCode === 66 || e.keyCode === 37) {
+      // C-e: Move cursor to end
+      else if (e.ctrlKey && e.keyCode === 69) {
+        e.preventDefault();
+        moveToEnd();
+        lineState.front = lineState.buf.length;
+      }
+      // C-b/Right arrow: Move backward
+      else if ((e.ctrlKey && e.keyCode === 66) || e.keyCode === 37) {
         // The textarea already has this builtin, so just update the state.
         if (lineState.front === 0) {
           e.preventDefault();
@@ -207,11 +261,25 @@ var psh = (function () {
           --lineState.front;
         }
       }
+      // M-b: Move backward one word
+      else if (e.altKey && e.keyCode === 66) {
+        e.preventDefault();
+        if (lineState.front > 0) {
+          moveBackWord();
+        }
+      }
       // C-f/Right arrow: Move forward;
-      else if (e.ctrlKey && e.keyCode === 70 || e.keyCode === 39) {
+      else if ((e.ctrlKey && e.keyCode === 70) || e.keyCode === 39) {
         // The textarea already has this builtin, so just update the state.
         if (lineState.front < lineState.buf.length) {
           ++lineState.front;
+        }
+      }
+      // M-n: Move forward one word
+      else if (e.altKey && e.keyCode === 70) {
+        e.preventDefault();
+        if (lineState.front < lineState.buf.length) {
+          moveForwardWord();
         }
       }
       // Shift/Alt/Ctrl
@@ -244,6 +312,7 @@ var psh = (function () {
     self.htmlElement.contentEditable = true;
     self.htmlElement.spellcheck = false;
     self.htmlElement.readonly = true;
+    self.htmlElement.autocomplete = false;
     self.htmlElement.addEventListener("keydown", keyHandler);
     self.htmlElement.addEventListener("click", clickHandler);
 
