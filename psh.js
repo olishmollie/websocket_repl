@@ -1,7 +1,20 @@
 var psh = (function () {
   var psh = function (opts) {
     const self = this;
+
     const socket = new WebSocket("ws://127.0.0.1:5000");
+
+    socket.addEventListener("open", (event) => {
+      console.log("Websocket connection open");
+    });
+
+    socket.addEventListener("message", (event) => {
+      messageCallfront(event);
+    });
+
+    socket.addEventListener("close", (event) => {
+      console.log("Websocket connection closed");
+    });
 
     // Tracks the line editing state.
     var lineState = {
@@ -15,8 +28,22 @@ var psh = (function () {
       buf: [],
       sp: -1,
       idx: 0,
-      max: 3,
+      max: opts.histSize,
     };
+
+    self.htmlElement = document.createElement("textarea");
+    self.htmlElement.style.boxSizing = "border-box";
+    self.htmlElement.style.height = "100%";
+    self.htmlElement.style.width = "100%";
+    self.htmlElement.style.background = "black";
+    self.htmlElement.style.color = "white";
+    self.htmlElement.style.resize = "none";
+    self.htmlElement.contentEditable = true;
+    self.htmlElement.spellcheck = false;
+    self.htmlElement.readonly = true;
+    self.htmlElement.autocomplete = false;
+    self.htmlElement.addEventListener("keydown", keyHandler);
+    self.htmlElement.addEventListener("click", clickHandler);
 
     resetMessageCallback();
 
@@ -36,10 +63,11 @@ var psh = (function () {
       self.htmlElement.setSelectionRange(pos, pos);
     }
 
-    // Push repl-generated text to the shell. Not for user input.
-    function push(txt) {
+    // Push text to the shell. Pass replGenerated=false for user input.
+    function push(txt, replGenerated = true) {
       self.htmlElement.value += txt;
-      lineState.back = getLength();
+      if (replGenerated)
+        lineState.back = getLength();
     }
 
     // Reset the line editing state.
@@ -53,6 +81,7 @@ var psh = (function () {
     function resetMessageCallback() {
       messageCallfront = (event) => {
         push(event.data);
+        self.htmlElement.scrollTop = self.htmlElement.scrollHeight;
       };
     }
 
@@ -61,6 +90,7 @@ var psh = (function () {
       messageCallfront = (event) => {
         push(event.data);
         f();
+        self.htmlElement.scrollTop = self.htmlElement.scrollHeight;
         resetMessageCallback();
       };
     }
@@ -150,17 +180,23 @@ var psh = (function () {
       return null;
     }
 
-    // Log shell state to the console.
-    function logState() {
-      if (opts.debug) {
-        console.info(lineState);
-        console.log(history);
-      }
-    }
-
     // Remove user text from `start` to `end`.
     function removeUserText(start, end) {
       self.htmlElement.setRangeText("", lineState.back + start, lineState.back + end);
+    }
+
+    // Log line-editing state to the console.
+    function logState() {
+      if (opts.debug) {
+        console.info(lineState);
+      }
+    }
+
+    // Log history state to the console.
+    function logHistory() {
+      if (opts.debug) {
+        console.log(history);
+      }
     }
 
     // Handle keydown events for line editing. The tricky part
@@ -171,9 +207,10 @@ var psh = (function () {
       if (e.keyCode === 13) {
         e.preventDefault();
         appendMessageCallback(resetState);
-        push("\n");
+        push("\n", false);
         socket.send(lineState.buf);
-        addToHistory(lineState.buf);
+        if (lineState.buf.length > 0)
+          addToHistory(lineState.buf);
       }
       // C-c
       else if (e.ctrlKey && e.keyCode === 67) {
@@ -183,7 +220,7 @@ var psh = (function () {
       else if (e.ctrlKey && e.keyCode === 76) {
         e.preventDefault();
         appendMessageCallback(() => {
-          self.htmlElement.value += lineState.buf;
+          push(lineState.buf, false);
         });
         setValue("");
         // Get the prompt back by sending empty data.
@@ -225,8 +262,9 @@ var psh = (function () {
         // TODO: Tab completion
         e.preventDefault();
         var spaces = "    ";
-        push(spaces);
+        push(spaces, false);
         lineState.buf += spaces;
+        lineState.front += spaces.length;
       }
       // C-p/Up arrow: Cycle through history backwards
       else if ((e.ctrlKey && e.keyCode === 80) || e.keyCode === 38) {
@@ -312,32 +350,9 @@ var psh = (function () {
       return lineState.buf;
     };
 
-    self.htmlElement = document.createElement("textarea");
-    self.htmlElement.cols = 80;
-    self.htmlElement.rows = 20;
-    self.htmlElement.style.background = "black";
-    self.htmlElement.style.color = "white";
-    self.htmlElement.style.height = "100%";
-    self.htmlElement.style.width = "100%";
-    self.htmlElement.style.resize = "none";
-    self.htmlElement.contentEditable = true;
-    self.htmlElement.spellcheck = false;
-    self.htmlElement.readonly = true;
-    self.htmlElement.autocomplete = false;
-    self.htmlElement.addEventListener("keydown", keyHandler);
-    self.htmlElement.addEventListener("click", clickHandler);
-
-    socket.addEventListener("open", (event) => {
-      console.log("Websocket connection open");
-    });
-
-    socket.addEventListener("message", (event) => {
-      messageCallfront(event);
-    });
-
-    socket.addEventListener("close", (event) => {
-      console.log("Websocket connection closed");
-    });
+    self.close = function() {
+      socket.close();
+    }
   };
 
   return psh;

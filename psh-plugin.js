@@ -1,28 +1,31 @@
 (function () {
   freeboard.loadWidgetPlugin({
     type_name: "psh",
-    display_name: "Freeboard Python Shell",
+    display_name: "Python Shell",
     description: "A Python shell for Freeboard",
-    external_scripts: ["psh.js"],
+    external_scripts: ["plugins/freeboard/psh.js"],
     fill_size: false,
     settings: [],
 
     newInstance: function (settings, newInstanceCallback) {
-      newInstanceCallback(new Psh(settings));
+      newInstanceCallback(new pshPlugin(settings));
     },
   });
 
-  var Psh = function (settings) {
+  var pshPlugin = function (settings) {
     var self = this;
     var currentSettings = settings;
-    var terminal = new psh();
+    var terminal = new psh({
+      "debug": false,
+      "histSize": 20,
+    });
 
     self.render = function (containerElement) {
       $(containerElement).append(terminal.htmlElement);
     };
 
     self.getHeight = function () {
-      return 5;
+      return 4;
     };
 
     self.onSettingsChanged = function (newSettings) {
@@ -31,6 +34,8 @@
 
     self.onCalculatedValueChanged = function (settingName, settingValue) {};
 
-    self.onDispose = function () {};
+    self.onDispose = function () {
+      terminal.close();
+    };
   };
 })();
