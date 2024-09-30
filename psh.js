@@ -1,15 +1,15 @@
 var psh = (function () {
   var psh = function (opts) {
     const self = this;
-
     const socket = new WebSocket("ws://127.0.0.1:5000");
+    var messageCallback;
 
     socket.addEventListener("open", (event) => {
       console.log("Websocket connection open");
     });
 
     socket.addEventListener("message", (event) => {
-      messageCallfront(event);
+      messageCallback(event);
     });
 
     socket.addEventListener("close", (event) => {
@@ -79,7 +79,7 @@ var psh = (function () {
 
     // Reset the message callback to its default value.
     function resetMessageCallback() {
-      messageCallfront = (event) => {
+      messageCallback = (event) => {
         push(event.data);
         self.htmlElement.scrollTop = self.htmlElement.scrollHeight;
       };
@@ -87,7 +87,7 @@ var psh = (function () {
 
     // Temporarily append `f` to the message callback.
     function appendMessageCallback(f) {
-      messageCallfront = (event) => {
+      messageCallback = (event) => {
         push(event.data);
         f();
         self.htmlElement.scrollTop = self.htmlElement.scrollHeight;
