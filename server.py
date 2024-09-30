@@ -58,7 +58,6 @@ class WebSocketServer:
             except KeyboardInterrupt:
                 if self.websocket:
                     self.websocket.close()
-                sys.stdout = sys.__stdout__
                 print("Exiting...")
 
 
