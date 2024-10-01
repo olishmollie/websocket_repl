@@ -28,7 +28,7 @@ var psh = (function () {
       buf: [],
       sp: -1,
       idx: 0,
-      max: opts.histSize,
+      max: opts.histSize || 20,
     };
 
     self.htmlElement = document.createElement("textarea");
@@ -60,6 +60,7 @@ var psh = (function () {
 
     // Move the cursor to position `pos`.
     function moveCursor(pos) {
+      pos = lineState.back + pos;
       self.htmlElement.setSelectionRange(pos, pos);
     }
 
@@ -97,7 +98,7 @@ var psh = (function () {
 
     // Move cursor to the end of the input.
     function moveToEnd() {
-      moveCursor(getLength());
+      moveCursor(lineState.buf.length);
     }
 
     // Prevent clicking into "uneditable" parts of the shell.
@@ -116,38 +117,43 @@ var psh = (function () {
       );
     }
 
+    // Is a character a word delimeter?
+    function isWordDelimeter(c) {
+        return " ".includes(c);
+    }
+
     // Move backward one word.
     function moveBackWord() {
-      var spaceIdx = lineState.front - 1;
       var inWord = false;
-      for (spaceIdx; spaceIdx >= 0; --spaceIdx) {
-        if (!inWord && lineState.buf[spaceIdx] != " ") {
+      var i = lineState.front - 1;
+      for (i; i >= 0; --i) {
+        if (!inWord && !isWordDelimeter(lineState.buf[i])) {
           inWord = true;
           continue;
         }
-        if (inWord && lineState.buf[spaceIdx] === " ") {
+        if (inWord && isWordDelimeter(lineState.buf[i])) {
           break;
         }
       }
-      lineState.front = spaceIdx + 1;
-      moveCursor(lineState.back + lineState.front);
+      lineState.front = i + 1;
+      moveCursor(lineState.front);
     }
 
     // Move forward one word.
     function moveForwardWord() {
-      var spaceIdx = lineState.front;
       var inWord = false;
-      for (spaceIdx; spaceIdx < lineState.buf.length; ++spaceIdx) {
-        if (!inWord && lineState.buf[spaceIdx] != " ") {
+      var i = lineState.front;
+      for (i; i < lineState.buf.length; ++i) {
+        if (!inWord && !isWordDelimeter(lineState.buf[i])) {
           inWord = true;
           continue;
         }
-        if (inWord && lineState.buf[spaceIdx] === " ") {
+        if (inWord && isWordDelimeter(lineState.buf[i])) {
           break;
         }
       }
-      lineState.front = spaceIdx;
-      moveCursor(lineState.back + lineState.front);
+      lineState.front = i;
+      moveCursor(lineState.front);
     }
 
     // Add `cmd` to history buffer.
@@ -199,9 +205,7 @@ var psh = (function () {
       }
     }
 
-    // Handle keydown events for line editing. The tricky part
-    // is to not clobber the textarea's functionality while
-    // also providing a decent line editing experience.
+    // Handle keydown events for line editing.
     function keyHandler(e) {
       // Newline
       if (e.keyCode === 13) {
@@ -292,8 +296,8 @@ var psh = (function () {
       // C-a: Move cursor to beginning
       else if (e.ctrlKey && e.keyCode === 65) {
         e.preventDefault();
-        moveCursor(lineState.back);
         lineState.front = 0;
+        moveCursor(lineState.front);
       }
       // C-e: Move cursor to end
       else if (e.ctrlKey && e.keyCode === 69) {
@@ -303,11 +307,9 @@ var psh = (function () {
       }
       // C-b/Right arrow: Move backward
       else if ((e.ctrlKey && e.keyCode === 66) || e.keyCode === 37) {
-        // The textarea already has this builtin, so just update the state.
-        if (lineState.front === 0) {
-          e.preventDefault();
-        } else {
-          --lineState.front;
+        e.preventDefault();
+        if (lineState.front > 0) {
+          moveCursor(--lineState.front);
         }
       }
       // M-b: Move backward one word
@@ -319,12 +321,12 @@ var psh = (function () {
       }
       // C-f/Right arrow: Move forward
       else if ((e.ctrlKey && e.keyCode === 70) || e.keyCode === 39) {
-        // The textarea already has this builtin, so just update the state.
+        e.preventDefault();
         if (lineState.front < lineState.buf.length) {
-          ++lineState.front;
+          moveCursor(++lineState.front);
         }
       }
-      // M-n: Move forward one word
+      // M-f: Move forward one word
       else if (e.altKey && e.keyCode === 70) {
         e.preventDefault();
         if (lineState.front < lineState.buf.length) {
