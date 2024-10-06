@@ -119,7 +119,9 @@ var psh = (function () {
 
     // Prevent clicking into "uneditable" parts of the shell.
     function clickHandler() {
-      // TODO
+      // TODO: This always moves the cursor to the end, forcing users to
+      // use line editing functions to move around. Since not everyone is
+      // familiar with the keystrokes, support clicking into editable text.
       moveToEnd();
     }
 
