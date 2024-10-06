@@ -8,8 +8,8 @@ from websockets.sync.server import ServerConnection, serve
 
 # Allow a websocket object (ServerConnection) to stand in for a file
 # object like stdout.
-ServerConnection.write = ServerConnection.send
-ServerConnection.flush = lambda _: None
+ServerConnection.write = ServerConnection.send # type: ignore
+ServerConnection.flush = lambda _: None # type: ignore
 
 
 class WebsocketRepl(InteractiveConsole):
