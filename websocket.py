@@ -4,10 +4,12 @@ import sys
 from code import InteractiveConsole
 from threading import Thread
 from typing import Any, Callable, Mapping
+from typing_extensions import override
 from websockets.sync.server import ServerConnection, serve
 
-# Allow a websocket object (ServerConnection) to stand in for a file
-# object like stdout.
+# Allow a websocket object to stand in for a file object like stdout.
+# Flush is hijacked because threads call print with `flush=True` on
+# an exception (e.g. KeyboardInterrupt).
 ServerConnection.write = ServerConnection.send # type: ignore
 ServerConnection.flush = lambda _: None # type: ignore
 
@@ -22,6 +24,7 @@ class WebsocketRepl(InteractiveConsole):
         self.websocket = websocket
         sys.stdout = self.websocket
 
+    @override
     def raw_input(self, prompt: str = "") -> str:
         self.websocket.send(prompt)
         code = str(self.websocket.recv())
@@ -30,6 +33,7 @@ class WebsocketRepl(InteractiveConsole):
                 code = ""
         return code
 
+    @override
     def write(self, data: str):
         """Write to the websocket if an exception occurs."""
         self.websocket.send(data)
@@ -50,6 +54,7 @@ class WebsocketServer(Thread):
         self.websockets = {}
         self.start()
 
+    @override
     def run(self):
         """Serve websocket connections until interrupted."""
         with serve(self.handler, host=self.host, port=self.port) as server:
