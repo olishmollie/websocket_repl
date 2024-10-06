@@ -1,9 +1,9 @@
 import logging
+import sys
 
 from code import InteractiveConsole
 from threading import Thread
 from typing import Any, Callable, Mapping
-from websockets.exceptions import ConnectionClosedOK
 from websockets.sync.server import ServerConnection, serve
 
 # Allow a websocket object (ServerConnection) to stand in for a file
@@ -20,6 +20,7 @@ class WebsocketRepl(InteractiveConsole):
     ):
         super().__init__(locals=locals)
         self.websocket = websocket
+        sys.stdout = self.websocket
 
     def raw_input(self, prompt: str = "") -> str:
         self.websocket.send(prompt)
@@ -38,14 +39,12 @@ class WebsocketServer(Thread):
     def __init__(
         self,
         handler: Callable[[ServerConnection], None],
-        on_exit: Callable[[], None],
         host: str = "127.0.0.1",
         port: int = 5000,
     ):
         super().__init__()
         self.daemon = True
         self.handler = handler
-        self.on_exit = on_exit
         self.host = host
         self.port = port
         self.websockets = {}
@@ -58,7 +57,7 @@ class WebsocketServer(Thread):
                 logging.info("Listening for connections on 127.0.0.1:5000...")
                 server.serve_forever()
             except KeyboardInterrupt:
-                self.on_exit()
+                sys.stdout = sys.__stdout__
                 for _, websocket in self.websockets.items():
                     websocket.close()
 
