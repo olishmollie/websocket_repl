@@ -1,26 +1,29 @@
-import sys
-import time
+import logging
 
 from code import InteractiveConsole
-from multiprocessing import Process
 from threading import Thread
+from typing import Any, Callable, Mapping
 from websockets.exceptions import ConnectionClosedOK
 from websockets.sync.server import ServerConnection, serve
 
+# Allow a websocket object (ServerConnection) to stand in for a file
+# object like stdout.
 ServerConnection.write = ServerConnection.send
-ServerConnection.flush = lambda x: None
+ServerConnection.flush = lambda _: None
 
 
 class WebsocketRepl(InteractiveConsole):
     FORBIDDEN = ["import code", "from code import", "exit()"]
 
-    def __init__(self, websocket: ServerConnection, locals=None):
+    def __init__(
+        self, websocket: ServerConnection, locals: Mapping[str, Any] | None = None
+    ):
         super().__init__(locals=locals)
         self.websocket = websocket
 
-    def raw_input(self, prompt=""):
+    def raw_input(self, prompt: str = "") -> str:
         self.websocket.send(prompt)
-        code = self.websocket.recv()
+        code = str(self.websocket.recv())
         for cmd in self.FORBIDDEN:
             if cmd in code:
                 code = ""
@@ -32,40 +35,30 @@ class WebsocketRepl(InteractiveConsole):
 
 
 class WebsocketServer(Thread):
-    def __init__(self, handler=None, host="127.0.0.1", port=5000):
+    def __init__(
+        self,
+        handler: Callable[[ServerConnection], None],
+        on_exit: Callable[[], None],
+        host: str = "127.0.0.1",
+        port: int = 5000,
+    ):
         super().__init__()
         self.daemon = True
+        self.handler = handler
+        self.on_exit = on_exit
         self.host = host
         self.port = port
-        self.handler = handler
-        if self.handler is None:
-            self.handler = self.default_handler
         self.websockets = {}
         self.start()
-
-    def default_handler(self, websocket: ServerConnection):
-        """Serve a Python REPL over the websocket connection."""
-        remote_address = websocket.remote_address
-        self.websockets[remote_address] = websocket
-        print(f"Connection {remote_address} established.")
-        sys.stdout = websocket
-        console = WebsocketRepl(websocket)
-        try:
-            console.interact()
-        except ConnectionClosedOK:
-            self.restore_stdout()
-            print(f"Connection {remote_address} closed.")
 
     def run(self):
         """Serve websocket connections until interrupted."""
         with serve(self.handler, host=self.host, port=self.port) as server:
             try:
-                print("Listening for connections on 127.0.0.1:5000...")
+                logging.info("Listening for connections on 127.0.0.1:5000...")
                 server.serve_forever()
             except KeyboardInterrupt:
-                self.restore_stdout()
+                self.on_exit()
                 for _, websocket in self.websockets.items():
                     websocket.close()
 
-    def restore_stdout(self):
-        sys.stdout = sys.__stdout__
