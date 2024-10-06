@@ -43,7 +43,7 @@ var psh = (function () {
       buf: [],
       sp: -1,
       idx: 0,
-      max: opts.histSize || 20,
+      max: opts.histSize,
     };
 
     self.htmlElement = document.createElement("textarea");
@@ -356,8 +356,8 @@ var psh = (function () {
           moveForwardWord();
         }
       }
-      // Shift/Alt/Ctrl
-      else if (e.keyCode >= 16 && e.keyCode <= 18) {
+      // Shift/Alt/Ctrl/Capslock
+      else if ((e.keyCode >= 16 && e.keyCode <= 18) || e.keyCode === 20) {
         // Do nothing.
       }
       // All other keys
@@ -379,6 +379,5 @@ var psh = (function () {
       socket.close();
     };
   };
-
   return psh;
 })();
