@@ -1,6 +1,6 @@
 (function () {
   freeboard.loadWidgetPlugin({
-    type_name: "psh",
+    type_name: "PythonShell",
     display_name: "Python Shell",
     description: "A Python shell for Freeboard",
     external_scripts: ["plugins/freeboard/psh.js"],
@@ -16,8 +16,10 @@
     var self = this;
     var currentSettings = settings;
     var terminal = new psh({
-      "debug": false,
-      "histSize": 20,
+      host: "127.0.0.1",
+      port: 3333,
+      debug: false,
+      histSize: 20,
     });
 
     self.render = function (containerElement) {

@@ -1,7 +1,17 @@
 var psh = (function () {
   var psh = function (opts) {
     const self = this;
-    const socket = new WebSocket("ws://127.0.0.1:5000");
+
+    const defaults = {
+      host: "127.0.0.1",
+      port: 5000,
+      debug: false,
+      histsize: 100
+    };
+
+    opts = {...defaults, ...opts};
+
+    const socket = new WebSocket("ws://" + opts.host + ":" + opts.port);
     var messageCallback;
 
     socket.addEventListener("open", (event) => {
