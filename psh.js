@@ -6,24 +6,29 @@ var psh = (function () {
       host: "127.0.0.1",
       port: 5000,
       debug: false,
-      histsize: 100
+      histsize: 100,
     };
 
-    opts = {...defaults, ...opts};
+    opts = { ...defaults, ...opts };
 
-    const socket = new WebSocket("ws://" + opts.host + ":" + opts.port);
+    const url = "ws://" + opts.host + ":" + opts.port;
+    const socket = new WebSocket(url);
     var messageCallback;
-
-    socket.addEventListener("open", (event) => {
-      console.log("Websocket connection open");
-    });
 
     socket.addEventListener("message", (event) => {
       messageCallback(event);
     });
 
+    socket.addEventListener("open", (event) => {
+      console.log("Connection with " + event.target.url + " established.");
+    });
+
     socket.addEventListener("close", (event) => {
-      console.log("Websocket connection closed");
+      console.log("Connection with " + event.target.url + " closed.");
+    });
+
+    socket.addEventListener("error", (event) => {
+      push("Error: " + "Failed to connect to " + event.target.url + ".");
     });
 
     // Tracks the line editing state.
@@ -77,8 +82,9 @@ var psh = (function () {
     // Push text to the shell. Pass replGenerated=false for user input.
     function push(txt, replGenerated = true) {
       self.htmlElement.value += txt;
-      if (replGenerated)
+      if (replGenerated) {
         lineState.back = getLength();
+      }
     }
 
     // Reset the line editing state.
@@ -129,7 +135,7 @@ var psh = (function () {
 
     // Is a character a word delimeter?
     function isWordDelimeter(c) {
-        return " ".includes(c);
+      return " ".includes(c);
     }
 
     // Move backward one word.
@@ -198,7 +204,11 @@ var psh = (function () {
 
     // Remove user text from `start` to `end`.
     function removeUserText(start, end) {
-      self.htmlElement.setRangeText("", lineState.back + start, lineState.back + end);
+      self.htmlElement.setRangeText(
+        "",
+        lineState.back + start,
+        lineState.back + end,
+      );
     }
 
     // Log line-editing state to the console.
@@ -223,8 +233,9 @@ var psh = (function () {
         appendMessageCallback(resetState);
         push("\n", false);
         socket.send(lineState.buf);
-        if (lineState.buf.length > 0)
+        if (lineState.buf.length > 0) {
           addToHistory(lineState.buf);
+        }
       }
       // C-c
       else if (e.ctrlKey && e.keyCode === 67) {
@@ -362,9 +373,9 @@ var psh = (function () {
       return lineState.buf;
     };
 
-    self.close = function() {
+    self.close = function () {
       socket.close();
-    }
+    };
   };
 
   return psh;
