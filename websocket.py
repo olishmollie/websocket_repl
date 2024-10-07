@@ -3,7 +3,7 @@ import sys
 
 from code import InteractiveConsole
 from threading import Thread
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Union
 from typing_extensions import override
 from websockets.sync.server import ServerConnection, serve
 
@@ -18,7 +18,7 @@ class WebsocketRepl(InteractiveConsole):
     FORBIDDEN = ["import code", "from code import", "exit()"]
 
     def __init__(
-        self, websocket: ServerConnection, locals: Mapping[str, Any] | None = None
+        self, websocket: ServerConnection, locals: Union[Mapping[str, Any], None] = None
     ):
         super().__init__(locals=locals)
         self.websocket = websocket

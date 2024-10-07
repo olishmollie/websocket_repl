@@ -356,8 +356,9 @@ var psh = (function () {
           moveForwardWord();
         }
       }
-      // Shift/Alt/Ctrl/Capslock
-      else if ((e.keyCode >= 16 && e.keyCode <= 18) || e.keyCode === 20) {
+      // Shift/Alt/Ctrl/Capslock/Esc
+      else if ((e.keyCode >= 16 && e.keyCode <= 18) || e.keyCode === 20
+        || e.keyCode === 27) {
         // Do nothing.
       }
       // All other keys
